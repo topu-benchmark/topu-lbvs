@@ -1,38 +1,55 @@
 cff-version: 1.2.0
-message: "If you use TopU-LBVS in your research, please cite the paper."
+message: "If you use TopU-LBVS in your work, please cite the paper below."
 title: "TopU-LBVS: A Realistic Multi-Target Benchmark for Ligand-Based Virtual Screening"
-type: dataset
+abstract: >-
+  TopU-LBVS is a multi-target benchmark for ligand-based virtual screening
+  under hard-negative screening conditions. It covers 93 protein targets across
+  7 protein classes, with property-matched and structurally similar decoys at a
+  fixed 1:40 active-to-decoy ratio. The benchmark provides three evaluation
+  protocols (full, few-shot, and a 7-target mini protocol with paired
+  random-decoy control) for reproducible comparison of LBVS methods.
+type: software
 authors:
-  - family-names: Kumar
-    given-names: Surbhi
-    affiliation: "UT Dallas, Mathematical Sciences"
-  - family-names: Zhou
-    given-names: Yuhe
+  - given-names: Surbhi
+    family-names: Kumar
+    affiliation: "University of Texas at Dallas, Department of Mathematical Sciences"
+  - given-names: Yuhe
+    family-names: Zhou
     affiliation: "National Institute of Biological Sciences, Beijing"
-  - family-names: Shiralkar
-    given-names: Varun
-    affiliation: "UT Dallas, Computer Science"
-  - family-names: Huang
-    given-names: Niu
+  - given-names: Varun
+    family-names: Shiralkar
+    affiliation: "University of Texas at Dallas, Department of Computer Science"
+  - given-names: Niu
+    family-names: Huang
     affiliation: "National Institute of Biological Sciences, Beijing"
-  - family-names: Coskunuzer
-    given-names: Baris
-    affiliation: "UT Dallas, Mathematical Sciences"
-year: 2026
+  - given-names: Baris
+    family-names: Coskunuzer
+    affiliation: "University of Texas at Dallas, Department of Mathematical Sciences"
+repository-code: "https://github.com/topu-benchmark/topu-lbvs"
+url: "https://huggingface.co/datasets/topu-benchmark/topu-lbvs"
+license: MIT
+keywords:
+  - ligand-based virtual screening
+  - molecular benchmarking
+  - hard decoys
+  - ChEMBL
+  - drug discovery
+  - graph neural networks
+  - molecular property prediction
+date-released: 2026-05-07
 preferred-citation:
-  type: conference-paper
+  type: unpublished
   title: "TopU-LBVS: A Realistic Multi-Target Benchmark for Ligand-Based Virtual Screening"
   authors:
-    - family-names: Kumar
-      given-names: Surbhi
-    - family-names: Zhou
-      given-names: Yuhe
-    - family-names: Shiralkar
-      given-names: Varun
-    - family-names: Huang
-      given-names: Niu
-    - family-names: Coskunuzer
-      given-names: Baris
+    - given-names: Surbhi
+      family-names: Kumar
+    - given-names: Yuhe
+      family-names: Zhou
+    - given-names: Varun
+      family-names: Shiralkar
+    - given-names: Niu
+      family-names: Huang
+    - given-names: Baris
+      family-names: Coskunuzer
   year: 2026
-  conference:
-    name: "Conference on Neural Information Processing Systems (NeurIPS) Datasets and Benchmarks Track"
+  notes: "Under review at NeurIPS 2026 Datasets and Benchmarks Track"
