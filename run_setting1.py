@@ -132,9 +132,7 @@ DEFAULT_SPLITS_DIR  = "./splits"
 DEFAULT_RESULTS_DIR = "./results/setting1"
 DEFAULT_SEEDS       = [2026, 2027, 2028]
 
-WANDB_ENTITY  = "kumar-surbhi1294-university-of-texas-at-dallas"
-WANDB_PROJECT = "LBVS"
-
+DEFAULT_WANDB_PROJECT = "LBVS"
 
 # -- CLI argument parser -------------------------------------------------------
 
@@ -178,6 +176,16 @@ def _parse_args():
     parser.add_argument(
         "--no_wandb", action="store_true",
         help="Disable wandb logging.",
+    )
+    
+    parser.add_argument(
+        "--wandb_entity", default=None,
+        help="WandB entity (team/user). If None, uses the user's default entity "
+             "from `wandb login`. Ignored when --no_wandb is set.",
+    )
+    parser.add_argument(
+        "--wandb_project", default=DEFAULT_WANDB_PROJECT,
+        help=f"WandB project name. Default: {DEFAULT_WANDB_PROJECT}",
     )
     
     parser.add_argument(
@@ -287,7 +295,7 @@ def main():
             target_kwargs.update(tuned)
 
         try:
-            result = run_target(
+            rresult = run_target(
                 model_cls     = model_cls,
                 model_kwargs  = target_kwargs,
                 target        = target,
@@ -296,8 +304,8 @@ def main():
                 results_dir   = args.results_dir,
                 seeds         = seeds,  # Pass custom or default seeds
                 use_wandb     = not args.no_wandb,
-                wandb_entity  = WANDB_ENTITY,
-                wandb_project = WANDB_PROJECT,
+                wandb_entity  = args.wandb_entity,
+                wandb_project = args.wandb_project,
             )
 
             if result is not None:

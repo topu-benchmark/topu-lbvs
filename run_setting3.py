@@ -153,8 +153,7 @@ DEFAULT_SEEDS       = [2026, 2027, 2028]
 # Setting 3 targets (7 representative targets from paper)
 SETTING3_TARGETS = ["cp2d6", "aa2ar", "kcnh2", "egfr", "esr1", "aces", "thrb"]
 
-WANDB_ENTITY  = "kumar-surbhi1294-university-of-texas-at-dallas"
-WANDB_PROJECT = "LBVS"
+DEFAULT_WANDB_PROJECT = "LBVS"
 
 
 # -- CLI argument parser -------------------------------------------------------
@@ -204,6 +203,15 @@ def _parse_args():
     parser.add_argument(
         "--no_wandb", action="store_true",
         help="Disable wandb logging.",
+    )
+    parser.add_argument(
+        "--wandb_entity", default=None,
+        help="WandB entity (team/user). If None, uses the user's default entity "
+             "from `wandb login`. Ignored when --no_wandb is set.",
+    )
+    parser.add_argument(
+        "--wandb_project", default=DEFAULT_WANDB_PROJECT,
+        help=f"WandB project name. Default: {DEFAULT_WANDB_PROJECT}",
     )
     parser.add_argument("--tuned_params_dir", default=None,
                         help="If set, load per-target best_params.json from "
@@ -338,8 +346,8 @@ def main():
                 results_dir   = args.results_dir,
                 seeds         = seeds,
                 use_wandb     = not args.no_wandb,
-                wandb_entity  = WANDB_ENTITY,
-                wandb_project = WANDB_PROJECT,
+                wandb_entity  = args.wandb_entity,
+                wandb_project = args.wandb_project,
                 setting       = 3,  # ← KEY CHANGE: Use Setting 3
             )
 
