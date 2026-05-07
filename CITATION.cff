@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use TopU-LBVS in your research, please cite the paper."
+title: "TopU-LBVS: A Realistic Multi-Target Benchmark for Ligand-Based Virtual Screening"
+type: dataset
+authors:
+  - family-names: Kumar
+    given-names: Surbhi
+    affiliation: "UT Dallas, Mathematical Sciences"
+  - family-names: Zhou
+    given-names: Yuhe
+    affiliation: "National Institute of Biological Sciences, Beijing"
+  - family-names: Shiralkar
+    given-names: Varun
+    affiliation: "UT Dallas, Computer Science"
+  - family-names: Huang
+    given-names: Niu
+    affiliation: "National Institute of Biological Sciences, Beijing"
+  - family-names: Coskunuzer
+    given-names: Baris
+    affiliation: "UT Dallas, Mathematical Sciences"
+year: 2026
+preferred-citation:
+  type: conference-paper
+  title: "TopU-LBVS: A Realistic Multi-Target Benchmark for Ligand-Based Virtual Screening"
+  authors:
+    - family-names: Kumar
+      given-names: Surbhi
+    - family-names: Zhou
+      given-names: Yuhe
+    - family-names: Shiralkar
+      given-names: Varun
+    - family-names: Huang
+      given-names: Niu
+    - family-names: Coskunuzer
+      given-names: Baris
+  year: 2026
+  conference:
+    name: "Conference on Neural Information Processing Systems (NeurIPS) Datasets and Benchmarks Track"

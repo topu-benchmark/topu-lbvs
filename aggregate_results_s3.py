@@ -1,0 +1,304 @@
+# -*- coding: utf-8 -*-
+"""
+aggregate_results_s3.py
+=======================
+Setting 3 (Random ChEMBL* decoys) aggregator. Mirrors aggregate_results_s2.py
+without the Tier 1/2 split (Setting 3 uses only 7 representative targets).
+
+All 7 metrics are reported equally - select your preferred primary metric
+downstream.
+
+Reads per-seed CSVs from results/setting3/{model_name}/per_seed/ and produces:
+
+    target | name | class | n_actives | n_decoys | ef_1pct | ef_5pct | ...
+
+where each metric is formatted as "mean +/- std".
+A final OVERALL row provides the macro-average across the 7 targets.
+
+Usage:
+    python aggregate_results_s3.py --model gin
+    python aggregate_results_s3.py --model ginfp
+
+Optional:
+    --results_dir /path/to/results/setting3
+    --seeds      2026 2027 2028
+    --out        /path/to/output.csv
+    --no_wandb
+"""
+
+import argparse
+import csv
+import glob
+import os
+import numpy as np
+
+WANDB_ENTITY  = "kumar-surbhi1294-university-of-texas-at-dallas"
+WANDB_PROJECT = "LBVS"
+
+# ---------------------------------------------------------------------------
+# Target metadata (same as Setting 1/2; only 7 are used in Setting 3)
+# ---------------------------------------------------------------------------
+
+TARGET_META = {
+    "cp2c9":  ("Cytochrome P450 2C9",                                          "Cytochrome P450"),
+    "cp3a4":  ("Cytochrome P450 3A4",                                          "Cytochrome P450"),
+    "cp2d6":  ("Cytochrome P450 2D6",                                          "Cytochrome P450"),
+    "cp1a2":  ("Cytochrome P450 1A2",                                          "Cytochrome P450"),
+    "aa2ar":  ("Adenosine A2a receptor",                                       "GPCR"),
+    "adrb1":  ("Beta-1 adrenergic receptor",                                   "GPCR"),
+    "adrb2":  ("Beta-2 adrenergic receptor",                                   "GPCR"),
+    "cxcr4":  ("C-X-C chemokine receptor type 4",                              "GPCR"),
+    "drd3":   ("Dopamine D3 receptor",                                         "GPCR"),
+    "oprd":   ("Delta opioid receptor",                                        "GPCR"),
+    "5ht6r":  ("Serotonin 6 (5-HT6) receptor",                                 "GPCR"),
+    "aa3r":   ("Adenosine A3 receptor",                                        "GPCR"),
+    "hrh3":   ("Histamine H3 receptor",                                        "GPCR"),
+    "oprk":   ("Kappa opioid receptor",                                        "GPCR"),
+    "oprm":   ("Mu opioid receptor",                                           "GPCR"),
+    "cnr2":   ("Cannabinoid CB2 receptor",                                     "GPCR"),
+    "drd2":   ("Dopamine D2 receptor",                                         "GPCR"),
+    "kcnh2":  ("HERG",                                                         "Ion Channel"),
+    "5ht3a":  ("Serotonin 3a (5-HT3a) receptor",                               "Ion Channel"),
+    "scn5a":  ("Sodium channel protein type V alpha subunit",                  "Ion Channel"),
+    "cac1h":  ("Voltage-gated T-type calcium channel alpha-1H subunit",        "Ion Channel"),
+    "trpa1":  ("Transient receptor potential cation channel subfamily A",      "Ion Channel"),
+    "abl1":   ("Tyrosine-protein kinase ABL",                                  "Kinase"),
+    "akt1":   ("Serine/threonine-protein kinase AKT",                          "Kinase"),
+    "akt2":   ("Serine/threonine-protein kinase AKT2",                         "Kinase"),
+    "braf":   ("Serine/threonine-protein kinase B-raf",                        "Kinase"),
+    "cdk2":   ("Cyclin-dependent kinase 2",                                    "Kinase"),
+    "csf1r":  ("Macrophage colony stimulating factor receptor",                "Kinase"),
+    "egfr":   ("Epidermal growth factor receptor erbB1",                       "Kinase"),
+    "fak1":   ("Focal adhesion kinase 1",                                      "Kinase"),
+    "fgfr1":  ("Fibroblast growth factor receptor 1",                          "Kinase"),
+    "igf1r":  ("Insulin-like growth factor I receptor",                        "Kinase"),
+    "jak2":   ("Tyrosine-protein kinase JAK2",                                 "Kinase"),
+    "kit":    ("Stem cell growth factor receptor",                             "Kinase"),
+    "kpcb":   ("Protein kinase C beta",                                        "Kinase"),
+    "lck":    ("Tyrosine-protein kinase LCK",                                  "Kinase"),
+    "mapk2":  ("MAP kinase-activated protein kinase 2",                        "Kinase"),
+    "met":    ("Hepatocyte growth factor receptor",                            "Kinase"),
+    "mk01":   ("MAP kinase ERK2",                                              "Kinase"),
+    "mk10":   ("c-Jun N-terminal kinase 3",                                    "Kinase"),
+    "mk14":   ("MAP kinase p38 alpha",                                         "Kinase"),
+    "mp2k1":  ("Dual specificity mitogen-activated protein kinase kinase 1",   "Kinase"),
+    "plk1":   ("Serine/threonine-protein kinase PLK1",                         "Kinase"),
+    "rock1":  ("Rho-associated protein kinase 1",                              "Kinase"),
+    "src":    ("Tyrosine-protein kinase SRC",                                  "Kinase"),
+    "tgfr1":  ("TGF-beta receptor type I",                                     "Kinase"),
+    "vgfr2":  ("Vascular endothelial growth factor receptor 2",                "Kinase"),
+    "wee1":   ("Serine/threonine-protein kinase WEE1",                         "Kinase"),
+    "andr":   ("Androgen Receptor",                                            "Nuclear Receptor"),
+    "esr1":   ("Estrogen receptor alpha",                                      "Nuclear Receptor"),
+    "esr2":   ("Estrogen receptor beta",                                       "Nuclear Receptor"),
+    "gcr":    ("Glucocorticoid receptor",                                      "Nuclear Receptor"),
+    "mcr":    ("Mineralocorticoid receptor",                                   "Nuclear Receptor"),
+    "ppara":  ("Peroxisome proliferator-activated receptor alpha",             "Nuclear Receptor"),
+    "ppard":  ("Peroxisome proliferator-activated receptor delta",             "Nuclear Receptor"),
+    "pparg":  ("Peroxisome proliferator-activated receptor gamma",             "Nuclear Receptor"),
+    "prgr":   ("Progesterone receptor",                                        "Nuclear Receptor"),
+    "rxra":   ("Retinoic acid receptor RXR-alpha",                             "Nuclear Receptor"),
+    "thb":    ("Thyroid hormone receptor beta",                                "Nuclear Receptor"),
+    "thrb":   ("Thrombin",                                                     "Protease"),
+    "ace":    ("Angiotensin-converting enzyme",                                "Enzyme"),
+    "aces":   ("Acetylcholinesterase",                                         "Enzyme"),
+    "ada17":  ("Disintegrin and metalloproteinase domain-containing protein 17","Enzyme"),
+    "ampc":   ("Beta-lactamase AmpC",                                          "Enzyme"),
+    "aofb":   ("Monoamine oxidase B",                                          "Enzyme"),
+    "bace1":  ("Beta-secretase 1",                                             "Enzyme"),
+    "cah2":   ("Carbonic anhydrase II",                                        "Enzyme"),
+    "dhi1":   ("11-beta-hydroxysteroid dehydrogenase 1",                       "Enzyme"),
+    "dpp4":   ("Dipeptidyl peptidase 4",                                       "Enzyme"),
+    "dyr":    ("Dihydrofolate reductase",                                      "Enzyme"),
+    "fnta":   ("Protein farnesyltransferase",                                  "Enzyme"),
+    "glcm":   ("Beta-glucocerebrosidase",                                      "Enzyme"),
+    "hdac2":  ("Histone deacetylase 2",                                        "Enzyme"),
+    "hdac8":  ("Histone deacetylase 8",                                        "Enzyme"),
+    "hivint": ("HIV type 1 integrase",                                         "Enzyme"),
+    "hivrt":  ("HIV type 1 reverse transcriptase",                             "Enzyme"),
+    "hmdh":   ("HMG-CoA reductase",                                            "Enzyme"),
+    "hxk4":   ("Hexokinase type IV",                                           "Enzyme"),
+    "inha":   ("Enoyl-acyl carrier protein reductase",                         "Enzyme"),
+    "nos1":   ("Nitric-oxide synthase, brain",                                 "Enzyme"),
+    "parp1":  ("Poly [ADP-ribose] polymerase 1",                               "Enzyme"),
+    "pde5a":  ("cGMP-specific 3,5-cyclic phosphodiesterase",                   "Enzyme"),
+    "pgh1":   ("Cyclooxygenase-1",                                             "Enzyme"),
+    "pgh2":   ("Cyclooxygenase-2",                                             "Enzyme"),
+    "ptn1":   ("Protein-tyrosine phosphatase 1B",                              "Enzyme"),
+    "pygm":   ("Glycogen phosphorylase, muscle form",                          "Enzyme"),
+    "pyrd":   ("Dihydroorotate dehydrogenase",                                 "Enzyme"),
+    "tysy":   ("Thymidylate synthase",                                         "Enzyme"),
+    "fa10":   ("Coagulation factor X",                                         "Protease"),
+    "hivpr":  ("HIV type 1 protease",                                          "Protease"),
+    "mmp13":  ("Matrix metalloproteinase 13",                                  "Protease"),
+    "try1":   ("Trypsin I",                                                    "Protease"),
+    "urok":   ("Urokinase-type plasminogen activator",                         "Protease"),
+    "hs90a":  ("Heat shock protein HSP 90-alpha",                              "Miscellaneous"),
+    "xiap":   ("Inhibitor of apoptosis protein 3",                             "Miscellaneous"),
+}
+
+METRICS = ["ef_1pct", "ef_5pct", "ef_10pct", "prauc", "rocauc", "bedroc", "logauc"]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def load_csv(path):
+    with open(path, newline="") as f:
+        return list(csv.DictReader(f))[0]
+
+
+def fmt(mean, std):
+    return f"{mean:.3f} \u00b1 {std:.3f}"
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model",       required=True)
+    parser.add_argument("--results_dir", default="./results/setting3")
+    parser.add_argument("--seeds",       nargs="+", type=int, default=[2026, 2027, 2028])
+    parser.add_argument("--out",         default=None)
+    parser.add_argument("--no_wandb",    action="store_true", help="Disable wandb logging.")
+    args = parser.parse_args()
+
+    per_seed_dir = os.path.join(args.results_dir, args.model, "per_seed")
+    out_path     = args.out or os.path.join(args.results_dir, args.model, "aggregate", "summary.csv")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+    all_files = glob.glob(os.path.join(per_seed_dir, f"*_seed{args.seeds[0]}.csv"))
+    targets   = sorted([
+        os.path.basename(f).replace(f"_seed{args.seeds[0]}.csv", "")
+        for f in all_files
+    ])
+
+    if not targets:
+        print(f"No completed targets found in {per_seed_dir}")
+        return
+
+    print(f"Found {len(targets)} completed targets for model '{args.model}'")
+
+    rows      = []
+    missing   = []
+    all_means = {m: [] for m in METRICS}
+
+    for target in targets:
+        seed_data = []
+        skip = False
+
+        for seed in args.seeds:
+            path = os.path.join(per_seed_dir, f"{target}_seed{seed}.csv")
+            if not os.path.exists(path):
+                missing.append(f"{target}_seed{seed}")
+                skip = True
+                break
+            seed_data.append(load_csv(path))
+
+        if skip:
+            continue
+
+        n_actives = int(seed_data[0]["n_actives"])
+        n_decoys  = int(seed_data[0]["n_decoys"])
+        name, cls = TARGET_META.get(target, ("Unknown", "Unknown"))
+
+        row = {
+            "target":    target,
+            "name":      name,
+            "class":     cls,
+            "n_actives": n_actives,
+            "n_decoys":  n_decoys,
+        }
+
+        for m in METRICS:
+            vals = [float(d[m]) for d in seed_data]
+            mean = float(np.mean(vals))
+            std  = float(np.std(vals, ddof=0))
+            row[m] = fmt(mean, std)
+            all_means[m].append(mean)
+
+        rows.append(row)
+
+    # OVERALL row (macro average across all included targets)
+    if rows:
+        overall = {
+            "target":    "OVERALL",
+            "name":      "",
+            "class":     "ALL",
+            "n_actives": sum(r["n_actives"] for r in rows),
+            "n_decoys":  sum(r["n_decoys"] for r in rows),
+        }
+        for m in METRICS:
+            means = all_means[m]
+            overall[m] = fmt(float(np.mean(means)), float(np.std(means, ddof=0)))
+        rows.append(overall)
+
+    fieldnames = ["target", "name", "class", "n_actives", "n_decoys"] + METRICS
+
+    with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    n_data_rows = len([r for r in rows if r["target"] != "OVERALL"])
+    print(f"Summary saved to: {out_path}")
+    print(f"Targets included: {n_data_rows}")
+
+    if missing:
+        print(f"WARNING: {len(missing)} missing seed CSVs skipped: {missing}")
+
+    # -- Log to wandb ---------------------------------------------------------
+    if not args.no_wandb and rows:
+        try:
+            import wandb
+        except ImportError:
+            print("wandb not installed; skipping wandb logging.")
+            return
+
+        data_rows = [r for r in rows if r["target"] != "OVERALL"]
+
+        run = wandb.init(
+            entity  = WANDB_ENTITY,
+            project = WANDB_PROJECT,
+            group   = "setting3_aggregate",
+            name    = f"{args.model}_setting3_aggregate",
+            job_type= "aggregate",
+            config  = {
+                "model":     args.model,
+                "setting":   3,
+                "n_targets": len(data_rows),
+                "seeds":     args.seeds,
+            },
+        )
+
+        for m in METRICS:
+            run.summary[f"overall/{m}_mean"] = float(np.mean(all_means[m]))
+
+        columns = ["target", "name", "class", "n_actives", "n_decoys"] + METRICS
+        table   = wandb.Table(columns=columns)
+        for r in data_rows:
+            table.add_data(*[r[c] for c in columns])
+        run.log({"per_target_results": table})
+
+        # Per-class mean EF@1% bar chart
+        classes   = sorted(set(r["class"] for r in data_rows))
+        class_ef1 = []
+        for cls in classes:
+            cls_rows  = [r for r in data_rows if r["class"] == cls]
+            cls_means = [float(r["ef_1pct"].split()[0]) for r in cls_rows]
+            class_ef1.append([cls, float(np.mean(cls_means))])
+
+        class_table = wandb.Table(columns=["class", "mean_ef1pct"], data=class_ef1)
+        run.log({"ef1pct_by_class": wandb.plot.bar(
+            class_table, "class", "mean_ef1pct",
+            title="Mean EF@1% by Protein Class")})
+
+        run.finish()
+        print(f"Results logged to wandb run: {args.model}_setting3_aggregate")
+
+
+if __name__ == "__main__":
+    main()
