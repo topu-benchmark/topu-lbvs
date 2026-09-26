@@ -56,15 +56,6 @@ WandB is optional — disable with `--no_wandb`, or set `--wandb_entity your-ent
 
 ---
 
-## Citation
 
-```bibtex
-@unpublished{topu_lbvs_2026,
-  title  = {TopU-LBVS: A Realistic Multi-Target Benchmark for Ligand-Based Virtual Screening},
-  author = {Kumar, Surbhi and Zhou, Yuhe and Shiralkar, Varun and Huang, Niu and Coskunuzer, Baris},
-  year   = {2026},
-  note   = {Under review at NeurIPS 2026 Datasets and Benchmarks Track}
-}
-```
 
 Issues and questions: please use the [GitHub issue tracker](https://github.com/topu-benchmark/topu-lbvs/issues).
